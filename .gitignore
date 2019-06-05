@@ -5,6 +5,8 @@ dist
 openhltest.egg-info
 /doc-browser/node_modules
 /doc-browser/src/assets/documentation.json
-/openhltest_client/openhltest/*
+/openhltest_client/openhltest/sessions/
+!/openhltest_client/openhltest/*.py
+/openhltest_client/openhltest/openhltest.py
 !/openhltest_client/*.py
 

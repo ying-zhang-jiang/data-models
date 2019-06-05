@@ -1,7 +1,7 @@
 """ The following is a sanity sample
 
 """
-from openhltest_client.httptransport import HttpTransport
+from openhltest.httptransport import HttpTransport
 
 
 # everything starts from the transport
