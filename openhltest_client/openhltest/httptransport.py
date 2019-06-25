@@ -81,7 +81,9 @@ class HttpTransport(Transport):
                             key_attr_name = dependency_key
                     value = []
                     for base_obj in locals_dict[key]:
-                        value.append(getattr(base_obj, key_attr_name))   
+                        value.append(getattr(base_obj, key_attr_name))
+                elif value is None:
+                    continue   
                 payload[yang_class.YANG_PROPERTY_MAP[key]] = value
         if method.lower() == 'post':
             return { 'openhltest:%s' % yang_class.YANG_NAME: [payload] }
@@ -151,6 +153,8 @@ class HttpTransport(Transport):
             raise UnauthorizedError(response)
         elif response.status_code == 404:
             raise NotFoundError(response)
+        elif response.status_code == 412:
+            raise OperationActionError(response)
         else:
             raise ServerError(response)
 
