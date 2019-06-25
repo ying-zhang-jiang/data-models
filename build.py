@@ -7,6 +7,8 @@ from setuptools import setup, find_packages
 import distutils
 import re
 import json
+import tempfile
+import stat
 
 PACKAGE_NAME='openhltest'
 INPUT_FILE_TYPE = 't:input-file'
@@ -208,6 +210,43 @@ class CiBuild(object):
         else:
             print('stopping build, git diff failed')
             sys.exit(1)
+
+    def format_model_files(self):
+        for root, dirs, files in os.walk(self._data_models_dir):
+            for name in files:
+                filename = os.path.join(root, name)
+                if os.path.basename(filename).endswith('.yang'):
+                    print('reformatting %s...' % filename)
+                    temp_filename = '%s.tmp' % filename
+                    if os.path.exists(temp_filename):
+                        os.chmod(temp_filename, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                        os.remove(temp_filename)                        
+                    hierarchy = [
+                        self._pyang,
+                        '--format',
+                        'yang',
+                        '--output',
+                        temp_filename,
+                        filename
+                    ]
+                    if os.name == 'nt':
+                        hierarchy.insert(0, self._python)
+                    self._run_process(hierarchy, self._data_models_dir)
+                    if self._is_different(filename, temp_filename):
+                        shutil.copy(temp_filename, filename)
+                    if os.path.exists(temp_filename):
+                        os.chmod(temp_filename, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                        os.remove(temp_filename)                        
+    
+    def _is_different(self, filename1, filename2):
+        with open(filename1) as fid1:
+            with open(filename2) as fid2:
+                for line1 in fid1:
+                    for line2 in fid2:
+                        if line1 != line2:
+                            return True
+                        break
+        return False          
 
     def generate_hierarchy(self):
         print('generating model hierarchy...')
@@ -414,7 +453,7 @@ class CiBuild(object):
             classDefinition += "\tYANG_KEYWORD = '%s'\n" % node['_keyword']
             list_key = "None"
             if '_key' in node:
-                list_key = "'%s'" % node['_key']
+                list_key = "'%s'" % node['_key'].split()[0]
             classDefinition += "\tYANG_KEY = %s\n" % list_key
             classDefinition += "\tYANG_PROPERTY_MAP = %s\n" % json.dumps(self._make_property_map(node))
             classDefinition += "\tYANG_ACTIONS = %s\n\n" % json.dumps(self._make_method_list(node))
@@ -686,12 +725,12 @@ class CiBuild(object):
         update_args = self._get_args(node, add_arg_key=False)
 
         if node['_keyword'] == 'list':
-            python_key = self._make_python_name(node['_key'])
-            crud += '\tdef read(self, %s=None):\n' % python_key
-            crud += '\t\t"""Get `%s` resource(s). Returns all resources from the server if `%s` is not specified\n\n' % (node['name'], python_key)
+            key = self._make_python_name(node['_key'].split()[0])
+            crud += '\tdef read(self, %s=None):\n' % key
+            crud += '\t\t"""Get `%s` resource(s). Returns all `%s` resources from the server if no input parameters are specified.\n\n' % (node['name'], node['name'])
             #crud += '\t\t\t%s (%s): %s\n' % (self._make_python_name(node['name']), arg['_type'], self._format_description('INLINE', arg, 0))
             crud += '\t\t"""\n'                     
-            crud += "\t\treturn self._read(%s)\n\n" % python_key
+            crud += "\t\treturn self._read(%s)\n\n" % key
 
             if node['_writeable'] is True:
                 crud += '\tdef create(self, %s):\n' % create_args[0]
@@ -865,6 +904,7 @@ class CiBuild(object):
 
 cibuild = CiBuild()
 cibuild.check_changed_files()
+cibuild.format_model_files()
 cibuild.generate_hierarchy()
 cibuild.generate_python_package()
 cibuild.generate_angular_doc_app() 

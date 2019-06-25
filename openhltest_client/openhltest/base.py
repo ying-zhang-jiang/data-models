@@ -5,6 +5,10 @@ from .errors import *
 import json
 import re
 
+try:
+    from urllib import quote
+except ImportError:
+    from urllib.parse import quote
 
 try:
     basestring
@@ -149,14 +153,14 @@ class Base(object):
         if relative_url is None:
             relative_url = ''
         if key_value is not None:
-            relative_url = '%s=%s' % (relative_url, key_value)
+            relative_url = '%s=%s' % (relative_url, quote(key_value))
         parent = self._parent
         while isinstance(parent, Base):
             if parent.YANG_KEYWORD == 'module':
                 break
             parent_path = parent.YANG_NAME
             if parent.YANG_KEY is not None:
-                parent_path = '%s=%s' % (parent.YANG_NAME, parent._get_value(parent.YANG_KEY))
+                parent_path = '%s=%s' % (parent.YANG_NAME, quote(parent._get_value(parent.YANG_KEY)))
             if len(relative_url) == 0:
                 relative_url = parent_path
             else:
