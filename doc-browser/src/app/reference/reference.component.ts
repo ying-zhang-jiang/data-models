@@ -591,7 +591,10 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 		code.push('# by default the HttpTransport will use the internal MockServer to allow for baseline testing\n')
 		code.push('# to connect to a vendor server implementation pass in a valid hostname or ip address\n')
 		code.push(`vendors_openhltest_server = None\n`);
-		code.push(`transport = HttpTransport(vendors_openhltest_server, api_key='optional api key')\n\n`);
+		code.push(`transport = HttpTransport(vendors_openhltest_server, log_file_name="/tmp/demo.log", api_key='optional api key')\n`);
+		code.push(`# or \n`);
+		code.push(`# transport = HttpTransport(vendors_openhltest_server')\n\n`);
+		code.push(`# transport.set_debug_level()\n`);
 		code.push(`# get an instance of the OpenHlTest module class\n`);
 		code.push('openhltest = transport.OpenHlTest\n\n');
 
@@ -648,7 +651,11 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 			code.push(`# ${action} an instance of the ${this.pythonName(treeNode.data.name)} class\n`);
 			//code.push(`# except for the ${this.pythonName(treeNode.data.name)} parameter, all of the remaining parameters in the create method are optional\n`);
 			let rightSideName = treeNode.parent.data.name.toLowerCase().replace(/-/g, '_');
-			code.push(`${leftSideName} = ${rightSideName}.${this.pythonName(treeNode.data.name)}`);
+			if (treeNode.data._writeable || (treeNode !== treeNodePath[treeNodePath.length - 1])) {
+				code.push(`${leftSideName} = ${rightSideName}.${this.pythonName(treeNode.data.name)}`);
+			} else {
+				code.push(`${leftSideName} = ${rightSideName}.${this.pythonName(treeNode.data.name)}.read()`);
+			}
 
 			let optional_parameters = this.getOptionalParameters(treeNode.data);
 
@@ -658,12 +665,13 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 				if (optional_parameters.length > 0) {
 					code.push(optional_parameters.join(''));
 				}
-				code.push(`)\n\n`);
+				code.push(`)`);
 			} else if (treeNode.data._keyword == 'list') {
-				code.push(`.read()\n\n`); 
-			} else {
-				code.push(`\n\n`);				
+				if (treeNode.data._writeable) {
+					code.push(`.read()`); 
+				}
 			}
+			code.push(`\n\n`);				
 
 			if (!isTreeNode) {
 				continue;
