@@ -60,14 +60,14 @@ module openhltest-patterns {
          It is used to determine the validity of the values being set in the child leaf nodes of the pattern.";
     }
     leaf single {
-      when '../pattern-type = SINGLE';
+      when "../pattern-type = 'SINGLE'";
       type string;
       must 're-match(single, ../pattern-format)';
       description
         "The value of the single pattern";
     }
     container increment {
-      when '../pattern-type = INCREMENT';
+      when "../pattern-type = 'INCREMENT'";
       description
         "The values that make up the increment pattern";
       leaf start {
@@ -84,7 +84,7 @@ module openhltest-patterns {
       }
     }
     container decrement {
-      when '../pattern-type = DECREMENT';
+      when "../pattern-type = 'DECREMENT'";
       description
         "";
       leaf start {
@@ -101,7 +101,7 @@ module openhltest-patterns {
       }
     }
     container random {
-      when '../pattern-type = RANDOM';
+      when "../pattern-type = 'RANDOM'";
       description
         "The repeatable random pattern.";
       leaf min {
@@ -129,7 +129,7 @@ module openhltest-patterns {
       }
     }
     leaf-list value-list {
-      when '../pattern-type = VALUE_LIST';
+      when "../pattern-type = 'VALUE_LIST'";
       type string;
       must 're-match(value-list, ../pattern-format)';
       description
@@ -284,14 +284,14 @@ module openhltest-patterns {
         "";
     }
     leaf single {
-      when '../pattern-type = SINGLE';
+      when "../pattern-type = 'SINGLE'";
       type string;
       must 're-match(single, ../pattern-format)';
       description
         "";
     }
     leaf-list value-list {
-      when '../pattern-type = VALUE_LIST';
+      when "../pattern-type = 'VALUE_LIST'";
       type string;
       must 're-match(value-list, ../pattern-format)';
       description
@@ -328,20 +328,20 @@ module openhltest-patterns {
         "";
     }
     leaf single {
-      when '../pattern-type = SINGLE';
+      when "../pattern-type = 'SINGLE'";
       type string;
       must 're-match(single, ../pattern-format)';
       description
         "";
     }
     leaf string {
-      when '../pattern-type = STRING';
+      when "../pattern-type = 'STRING'";
       type string;
       description
         "Vendor specific string patterns";
     }
     leaf-list value-list {
-      when '../pattern-type = VALUE_LIST';
+      when "../pattern-type = 'VALUE_LIST'";
       type string;
       must 're-match(value-list, ../pattern-format)';
       description
