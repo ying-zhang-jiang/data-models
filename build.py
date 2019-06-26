@@ -39,6 +39,8 @@ class CiBuild(object):
         self._python = os.path.normpath(sys.executable)
         self._python_dir = os.path.dirname(self._python)
         self._view_models_dir = os.path.normpath('%s/views' % self._root_dir)
+        if os.path.exists(self._view_models_dir) == False:
+            os.mkdir(self._view_models_dir)
         self._doc_file = os.path.normpath('%s/doc-browser/src/assets/documentation.json' % self._root_dir)
         self._python_client_dir = os.path.normpath('%s/openhltest_client' % self._root_dir)
         if 'TRAVIS' in os.environ:
@@ -210,6 +212,29 @@ class CiBuild(object):
         else:
             print('stopping build, git diff failed')
             sys.exit(1)
+
+    def generate_model_views(self):
+        for view_format, view_ext in [('tree', 'txt'), ('jstree', 'html')]:
+            output_file = os.path.normpath('%s/openhltest_model.%s' %(self._view_models_dir, view_ext))
+            if os.path.exists(output_file):
+                os.unlink(output_file)
+            print('generating %s model view...' % view_format)
+            view = [
+                self._pyang,
+                '--strict',
+                '--format',
+                view_format,
+                '--output',
+                output_file,
+                '--path',
+                self._data_models_dir,
+                self._root_model
+            ]
+            if os.name == 'nt':
+                view.insert(0, self._python)
+            if self._run_process(view, self._data_models_dir) > 0:
+                print('generate model views failed')
+                sys.exit(1)
 
     def format_model_files(self):
         for root, dirs, files in os.walk(self._data_models_dir):
@@ -500,7 +525,7 @@ class CiBuild(object):
                     classProperties += '\tdef %s(self):\n' % class_name
                     classProperties += self._format_description('CLASS_PROPERTY', child, 2)
                     classProperties += '\t\tfrom %s import %s\n' % (self._make_return_path(child, True), class_name)
-                    if child['_keyword'] == 'list':
+                    if child['_keyword'] == 'list' or False == child['_writeable']:
                         classProperties += '\t\treturn %s(self)\n\n' % class_name
                     else:
                         classProperties += '\t\treturn %s(self)._read()\n\n' % class_name
@@ -907,6 +932,7 @@ cibuild.check_changed_files()
 cibuild.format_model_files()
 cibuild.generate_hierarchy()
 cibuild.generate_python_package()
+cibuild.generate_model_views()
 cibuild.generate_angular_doc_app() 
 cibuild.build_python_package()
 cibuild.deploy_python_package()
