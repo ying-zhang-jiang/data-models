@@ -98,47 +98,47 @@ class CiBuild(object):
                 print('failed to clone OpenHLTest.github.io')
                 sys.exit(-1)
 
-        if os.name == 'nt':
-            print('install pyang package...')
-            process_args = [
-                self._pip,
-                'install',
-                '--upgrade',
-                'pyang'
-            ]
-            self._run_process(process_args, self._root_dir)
-            print('install setuptools package...')
-            process_args = [
-                self._pip,
-                'install',
-                '--upgrade',
-                'setuptools'
-            ]
-            self._run_process(process_args, self._root_dir)
-            print('install wheel package...')
-            process_args = [
-                self._pip,
-                'install',
-                '--upgrade',
-                'wheel'
-            ]
-            self._run_process(process_args, self._root_dir)
-            print('install requests package...')
-            process_args = [
-                self._pip,
-                'install',
-                '--upgrade',
-                'requests'
-            ]
-            self._run_process(process_args, self._root_dir)
-            print('install twine package...')
-            process_args = [
-                self._pip,
-                'install',
-                '--upgrade',
-                'twine'
-            ]
-            self._run_process(process_args, self._root_dir)
+            if os.name == 'nt':
+                print('install pyang package...')
+                process_args = [
+                    self._pip,
+                    'install',
+                    '--upgrade',
+                    'pyang'
+                ]
+                self._run_process(process_args, self._root_dir)
+                print('install setuptools package...')
+                process_args = [
+                    self._pip,
+                    'install',
+                    '--upgrade',
+                    'setuptools'
+                ]
+                self._run_process(process_args, self._root_dir)
+                print('install wheel package...')
+                process_args = [
+                    self._pip,
+                    'install',
+                    '--upgrade',
+                    'wheel'
+                ]
+                self._run_process(process_args, self._root_dir)
+                print('install requests package...')
+                process_args = [
+                    self._pip,
+                    'install',
+                    '--upgrade',
+                    'requests'
+                ]
+                self._run_process(process_args, self._root_dir)
+                print('install twine package...')
+                process_args = [
+                    self._pip,
+                    'install',
+                    '--upgrade',
+                    'twine'
+                ]
+                self._run_process(process_args, self._root_dir)
         print('init complete')
 
     def _find(self, name, path):
@@ -525,7 +525,7 @@ class CiBuild(object):
                     classProperties += '\tdef %s(self):\n' % class_name
                     classProperties += self._format_description('CLASS_PROPERTY', child, 2)
                     classProperties += '\t\tfrom %s import %s\n' % (self._make_return_path(child, True), class_name)
-                    if child['_keyword'] == 'list' or False == child['_writeable']:
+                    if child['_keyword'] == 'list' or False == child['_writeable'] or (child.get('_presence', None) != None):
                         classProperties += '\t\treturn %s(self)\n\n' % class_name
                     else:
                         classProperties += '\t\treturn %s(self)._read()\n\n' % class_name
@@ -679,8 +679,6 @@ class CiBuild(object):
             else:
                 methods += "\t\t\t\tfile_name = '%s_%s_' + date_time\n" % (node['name'], name)
             methods += "\t\t\t\tfile_name = os.path.join(def_dir, file_name)\n" 
-            methods += "\t\t\telif 0 == len(os.path.dirname(file_name)):\n"
-            methods += "\t\t\t\tfile_name = os.path.join(def_dir, file_name)\n"
             methods += "\t\t\twith open(file_name, 'wb') as fid:\n" 
             methods += "\t\t\t\tfid.write(base64.b64decode(output%s))\n" % json_output_file_content_key
         methods += "\t\treturn output['openhltest:output']\n\n"
@@ -756,9 +754,13 @@ class CiBuild(object):
             #crud += '\t\t\t%s (%s): %s\n' % (self._make_python_name(node['name']), arg['_type'], self._format_description('INLINE', arg, 0))
             crud += '\t\t"""\n'                     
             crud += "\t\treturn self._read(%s)\n\n" % key
-
+        
+        if node['_keyword'] == 'list' or (node.get('_presence', None) != None):
             if node['_writeable'] is True:
-                crud += '\tdef create(self, %s):\n' % create_args[0]
+                if 0 == len(create_args[0]):
+                    crud += '\tdef create(self):\n'
+                else:
+                    crud += '\tdef create(self, %s):\n' % create_args[0]
                 crud += '\t\t"""Create an instance of the `%s` resource\n\n' % node['name']
                 if len(create_args[1]) > 0:
                     crud += '\t\tArgs:\n'

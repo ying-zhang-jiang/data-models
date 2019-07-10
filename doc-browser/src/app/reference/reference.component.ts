@@ -526,13 +526,27 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 	}
 	private getPropertyEqualsValue(yangNode: IYangNode, parentNode: IYangNode = undefined): string {
 		let value = `None`;
-		if (parentNode && parentNode._key === yangNode.name) {
+		if (parentNode && (parentNode._keyword === 'list' && parentNode._key === yangNode.name)) {
 			value = `'A unique ${parentNode.name} ${yangNode.name} ${this.nextId}'`;
 		} else if (this.isLeafRef(yangNode) && this.getNodePathFromLeafRefPath(yangNode) !== parentNode._path) {
-			value = parentNode.name.toLowerCase().replace(/-/g, '_') + '_' + yangNode.name.toLowerCase().replace(/-/g, '_');
+			let ref_path = this.getNodePathFromLeafRefPath(yangNode);
+			ref_path = `/` + ref_path.substr('openhltest:'.length);
+			let ref_name = ``
+			for (let leafRefPath of yangNode._leafref_paths) {
+				if (leafRefPath.startsWith( ref_path) && leafRefPath.length > ref_path.length){
+					ref_name = this.pythonName(leafRefPath.substr(ref_path.length + 1));
+					break;
+				}
+			}
+			value =  parentNode.name.toLowerCase().replace(/-/g, '_') + '_' + yangNode.name.toLowerCase().replace(/-/g, '_') +'.' + ref_name;
+			if (yangNode._keyword === 'leaf-list')
+				value = `[` + value + `]`;
 		} 
 		else if (yangNode._type_pattern) {
 			value = `'${yangNode._type_pattern}'`;
+		} else if (yangNode._type === 'string'){
+			if (yangNode._keyword === 'leaf-list')
+				value = '[]';
 		}
 		let hyperlink = this.createHyperlink(yangNode.id, this.pythonName(yangNode.name));	
 		return `${hyperlink}=${value}`;
@@ -553,13 +567,18 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 	}
 	private getOptionalParameters(yangNode: IYangNode): string[] {
 		let optional_parameters = [];
+		let first_opt_param = true;
 		if (yangNode.children) {
 			for (let child of yangNode.children) {
-				if (child.name === yangNode._key || child._writeable === false) {
+				if ((yangNode._keyword === 'list' && child.name === yangNode._key) || child._writeable === false) {
 					continue;
 				}
 				if(this.isProperty(child)) {
-					optional_parameters.push(`, ${this.getPropertyEqualsValue(child, yangNode)}`);
+					if (first_opt_param)
+						first_opt_param = false;
+					else 
+						optional_parameters.push(`,`);
+					optional_parameters.push(`${this.getPropertyEqualsValue(child, yangNode)}`);
 				}
 			}
 		}
@@ -576,6 +595,32 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 		}
 		return undefined;
 	}
+	private getRefNodes(currentNode: TreeNode, leafRefNodes: Array<ILeafRefNode>) {
+		if (currentNode.children) {
+			for (let child of currentNode.children) {
+				if (this.isLeafRef(child.data)) {
+					let nodePath = this.getNodePathFromLeafRefPath(child.data);
+					if (nodePath) {
+						let leafRefNode = this.getNode(this.rootNode, nodePath);
+						if (leafRefNode.data._path !== currentNode.data._path) {
+							let found = false;
+							for (let _node of leafRefNodes) {
+								if (_node.sourceNode === child){
+									found = true;
+									break;
+								}
+							}
+							if ( found === false) {
+								this.getRefNodes(leafRefNode, leafRefNodes);
+								leafRefNodes.push({sourceNode: child, targetNode: leafRefNode});
+							}
+						}
+					}
+				}
+			}
+		}	
+	}
+
 	private setPythonSample() {
 		if (this._sampleCode === undefined)
 			return;
@@ -602,20 +647,7 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 		let leafRefNodes = Array<ILeafRefNode>();
 		let currentNode = this._currentDocNode;
 		while (currentNode && currentNode.data._keyword != 'module') {
-			if (currentNode.children) {
-				for (let child of currentNode.children) {
-					if (this.isLeafRef(child.data)) {
-						let nodePath = this.getNodePathFromLeafRefPath(child.data);
-						if (nodePath) {
-							let leafRefNode = this.getNode(this.rootNode, nodePath);
-							if (leafRefNode.data._path !== currentNode.data._path) {
-								leafRefNodes.push({sourceNode: child, targetNode: leafRefNode});
-							}
-						}
-					}
-				}
-			}	
-
+			this.getRefNodes( currentNode, leafRefNodes);
 			switch(currentNode.data._keyword) {
 				case 'list':
 				case 'container':
@@ -626,7 +658,7 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 		}
 
 		// insert leaf ref nodes 
-		for (let leafRefNode of leafRefNodes) {
+		for (let leafRefNode of leafRefNodes.reverse()) {
 			let pieces = leafRefNode.targetNode.data._path.split('/');
 			pieces.pop();
 			let parentPath = pieces.join('/');
@@ -647,7 +679,7 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 			} else {
 				leftSideName = treeNode.data.name.toLowerCase().replace(/-/g, '_');
 			}
-			let action = treeNode.data._keyword === 'list' && treeNode.data._writeable ? 'create' : 'get';
+			let action = (treeNode.data._keyword === 'list' && treeNode.data._writeable) || ((treeNode.data._keyword === 'container') && treeNode.data._presence !== undefined) ? 'create' : 'get';
 			code.push(`# ${action} an instance of the ${this.pythonName(treeNode.data.name)} class\n`);
 			//code.push(`# except for the ${this.pythonName(treeNode.data.name)} parameter, all of the remaining parameters in the create method are optional\n`);
 			let rightSideName = treeNode.parent.data.name.toLowerCase().replace(/-/g, '_');
@@ -657,12 +689,17 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 				code.push(`${leftSideName} = ${rightSideName}.${this.pythonName(treeNode.data.name)}.read()`);
 			}
 
-			let optional_parameters = this.getOptionalParameters(treeNode.data);
+			let optional_parameters = [];
 
 			if (action === 'create') {
-				let keyNode = treeNode.data.children.find((c) => c.name == treeNode.data._key);
-				code.push(`.create(${this.getPropertyEqualsValue(keyNode, treeNode.data)}`);
-				if (optional_parameters.length > 0) {
+				if (treeNode.data._keyword === 'list'){
+					let keyNode = treeNode.data.children.find((c) => c.name == treeNode.data._key);
+					code.push(`.create(${this.getPropertyEqualsValue(keyNode, treeNode.data)}, `);
+				} else 
+					code.push(`.create(`);
+				optional_parameters = this.getOptionalParameters(treeNode.data);
+	
+					if (optional_parameters.length > 0) {
 					code.push(optional_parameters.join(''));
 				}
 				code.push(`)`);
@@ -681,7 +718,7 @@ export class ReferenceComponent implements OnInit, AfterViewInit {
 				code.push(`# update the current ${this.pythonName(treeNode.data.name)} resource encapsulated in the ${leftSideName} instance\n`);
 				code.push(`# all of the parameters in the update method are optional\n`);
 				code.push(`${leftSideName}.update(`);
-				code.push(`${optional_parameters.join('').substr(1).trim()})\n\n`);
+				code.push(`${optional_parameters.join('').trim()})\n\n`);
 			}
 			
 			if (treeNode.data.name === this.YangNode.name) {
